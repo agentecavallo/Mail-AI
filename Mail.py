@@ -1,12 +1,13 @@
 import streamlit as st
 import google.generativeai as genai
+import urllib.parse
 
-# 1. Configurazione Sicurezza (Recupero dai Secrets)
+# 1. Configurazione Sicurezza
 try:
     api_key = st.secrets["GEMINI_API_KEY"]
     genai.configure(api_key=api_key)
 except:
-    st.error("⚠️ Errore: API Key non trovata. Controlla i Secrets su Streamlit Cloud.")
+    st.error("⚠️ Configura la chiave nei 'Secrets' di Streamlit!")
     st.stop()
 
 model = genai.GenerativeModel('gemini-1.5-flash')
@@ -15,56 +16,59 @@ st.set_page_config(page_title="Area Manager AI", page_icon="👞")
 st.title("👞 Assistant Area Manager")
 st.markdown("---")
 
-# --- NUOVA INTERFACCIA CON PUNTI 1 E 3 ---
-
-# Riga 1: Dati Base
+# --- INTERFACCIA ---
 col1, col2 = st.columns(2)
 with col1:
-    distributore = st.text_input("Nome Distributore", placeholder="Es: TecnoSafety Srl")
+    distributore = st.text_input("Nome Distributore", placeholder="Es: Rossi Sicurezza")
+    oggetto = st.text_input("Oggetto Mail", placeholder="Es: Aggiornamento Listino Calzature")
+
 with col2:
-    oggetto = st.text_input("Oggetto Mail", placeholder="Es: Promo scarpe estive")
+    profilo = st.selectbox("Profilo Partner", ["Partner Storico", "Nuovo Lead", "Recupero Rapporto"])
+    obiettivo = st.selectbox("Obiettivo", ["Svuotare Magazzino", "Inserimento Nuovo Articolo", "Aumento Sell-out", "Fissare Formazione"])
 
-# Riga 2: Strategia (Punto 1 e 3)
-col3, col4 = st.columns(2)
-with col3:
-    profilo = st.selectbox(
-        "Profilo Partner (Punto 1)",
-        ["Partner Storico (Tono caldo)", "Nuovo Lead (Tono professionale)", "Recupero Rapporto (Tono empatico)"]
-    )
-with col4:
-    obiettivo = st.selectbox(
-        "Obiettivo Commerciale (Punto 3)",
-        ["Svuotare Magazzino", "Inserimento Nuovo Articolo", "Aumento Sell-out", "Fissare Formazione Tecnica"]
-    )
+bozza = st.text_area("Appunti veloci per la mail", placeholder="Es: visti ottimi risultati mese scorso, proporre nuova linea S3S traspirante...")
 
-# Riga 3: Contenuto Libero
-bozza = st.text_area("Cosa vuoi comunicare? (Appunti veloci)", 
-                      placeholder="Es: ordini ottimi, presentare nuova linea S3, sconto 5% per ordini entro venerdì")
+# Funzione per creare il link di Outlook
+def create_outlook_link(subject, body):
+    query = urllib.parse.quote(body)
+    subject_query = urllib.parse.quote(subject)
+    return f"mailto:?subject={subject_query}&body={query}"
 
-# --- GENERAZIONE ---
-if st.button("Genera Email Strategica"):
+if st.button("Genera 2 Versioni Strategiche"):
     if distributore and bozza:
         prompt = f"""
-        Sei un Area Manager esperto nel settore DPI e calzature antinfortunistiche.
-        Scrivi un'email a un distributore con queste caratteristiche:
-        - Nome: {distributore}
-        - Profilo Relazionale: {profilo}
-        - Obiettivo Principale: {obiettivo}
-        - Oggetto: {oggetto}
-        - Note dell'utente: {bozza}
+        Sei un Area Manager nel settore DPI calzature. Scrivi DUE varianti di email per {distributore}.
+        Profilo: {profilo}. Obiettivo: {obiettivo}. Oggetto: {oggetto}. Note: {bozza}.
         
-        REGOLE:
-        1. Se il profilo è 'Partner Storico', usa un linguaggio che valorizzi la collaborazione passata.
-        2. Se l'obiettivo è 'Fissare Formazione', sottolinea come questo aiuterà i suoi venditori a chiudere più contratti.
-        3. Scrivi in un italiano fluido, da professionista a professionista, evitando lo stile 'robotico'.
+        VERSIONE 1: Formale e precisa, focalizzata sui dati e sui vantaggi tecnici.
+        VERSIONE 2: Più colloquiale e relazionale, focalizzata sulla partnership e sul supporto.
+        
+        Separa le due versioni chiaramente con la scritta "---VERSIONE2---".
+        Usa un italiano fluido da professionista B2B.
         """
         
-        with st.spinner('Elaborazione strategia in corso...'):
-            try:
-                response = model.generate_content(prompt)
-                st.subheader("Email Pronta:")
-                st.code(response.text, language="text")
-            except Exception as e:
-                st.error(f"Errore durante la generazione: {e}")
+        with st.spinner('Gemini sta scrivendo...'):
+            response = model.generate_content(prompt).text
+            
+            if "---VERSIONE2---" in response:
+                v1, v2 = response.split("---VERSIONE2---")
+            else:
+                v1, v2 = response, "Errore nella generazione della seconda versione."
+
+            # Creazione delle TAB per visualizzare le 2 versioni
+            tab1, tab2 = st.tabs(["📌 Versione Formale", "🤝 Versione Relazionale"])
+
+            with tab1:
+                st.code(v1, language="text")
+                link_v1 = create_outlook_link(oggetto, v1)
+                st.markdown(f'<a href="{link_v1}" target="_blank" style="background-color: #0078d4; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">📧 Apri in Outlook (V1)</a>', unsafe_allow_html=True)
+
+            with tab2:
+                st.code(v2, language="text")
+                link_v2 = create_outlook_link(oggetto, v2)
+                st.markdown(f'<a href="{link_v2}" target="_blank" style="background-color: #0078d4; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">📧 Apri in Outlook (V2)</a>', unsafe_allow_html=True)
     else:
-        st.warning("Inserisci almeno il nome del distributore e una bozza di testo.")
+        st.warning("Inserisci i dati necessari!")
+
+st.markdown("---")
+st.caption("Strumento Area Manager - Settore DPI")
