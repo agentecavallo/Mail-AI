@@ -1,55 +1,69 @@
-import streamlit as st
+        import streamlit as st
 import google.generativeai as genai
 
-# Configurazione API Gemini
-genai.configure(api_key="LA_TUA_API_KEY")
-model = genai.GenerativeModel('gemini-pro')
+# 1. Configurazione Sicurezza (Legge dai Secrets di Streamlit)
+try:
+    api_key = st.secrets["GEMINI_API_KEY"]
+    genai.configure(api_key=api_key)
+except:
+    st.error("⚠️ Errore: API Key non configurata. Vai in Settings > Secrets su Streamlit Cloud.")
+    st.stop()
 
-st.title("🚀 Sales Manager AI - Generatore Email Distributori")
+# Inizializza il modello (1.5-flash è ottimo per le email)
+model = genai.GenerativeModel('gemini-1.5-flash')
 
-# 1. Input Nome Cliente
-nome_cliente = st.text_input("Nome Distributore", placeholder="Es: Rossi Antinfortunistica")
+st.set_page_config(page_title="Area Manager AI Assistant", page_icon="👞")
 
-# 2. Oggetto
-oggetto_mail = st.text_input("Oggetto dell'email")
+st.title("👞 Assistant Area Manager")
+st.markdown("---")
 
-# 3. Finalità (Selettore)
-finalita = st.selectbox(
-    "Finalità della comunicazione",
-    ["Ringraziamento (Rilassato)", "Proposta Offerta (Schematico)", "Richiesta Appuntamento (Pragmatico)"]
-)
+# --- INTERFACCIA ---
+col1, col2 = st.columns(2)
 
-# 4. Bozza Testo (Punti chiave)
-bozza_input = st.text_area("Punti chiave da includere", placeholder="Es: visti ottimi risultati, proporre stock calzature S3 per stagione invernale")
+with col1:
+    nome_cliente = st.text_input("Distributore", placeholder="Es: Rossi Srl")
+    oggetto_mail = st.text_input("Oggetto", placeholder="Es: Nuova collezione 2026")
 
+with col2:
+    finalita = st.selectbox(
+        "Finalità",
+        ["Ringraziamento (Rilassato)", "Proposta Offerta (Schematico)", "Richiesta Appuntamento (Pragmatico)"]
+    )
+
+bozza_input = st.text_area("Cosa vuoi scrivere? (Bozza veloce)", 
+                            placeholder="Es: ringrazia per l'ordine, proponi campionario estivo, sottolinea sconti volume")
+
+# --- LOGICA DI GENERAZIONE ---
 if st.button("Genera Email"):
-    if nome_cliente and bozza_input:
-        # Definizione del prompt in base alla finalità
-        istruzioni_stile = ""
+    if not nome_cliente or not bozza_input:
+        st.warning("Compila il nome del distributore e la bozza per continuare.")
+    else:
+        # Prompt dinamico basato sulla finalità
         if "Ringraziamento" in finalita:
-            istruzioni_stile = "Usa un tono rilassato e amichevole. Sottolinea l'importanza della partnership e il buon lavoro svolto."
+            stile = "tono rilassato, amichevole ma professionale, focus sul rapporto di partnership."
         elif "Offerta" in finalita:
-            istruzioni_stile = "Usa un tono schematico e professionale. Elenca i vantaggi commerciali e tecnici in modo chiaro (usa i bullet points)."
+            stile = "tono schematico, usa bullet points per i vantaggi, focus su margini e disponibilità."
         else:
-            istruzioni_stile = "Usa un tono pragmatico e diretto. Vai subito al punto e proponi una call o un incontro fissando un obiettivo."
+            stile = "tono pragmatico e diretto, focus sull'agenda e sull'efficienza."
 
         prompt = f"""
-        Sei un Area Manager esperto di un'azienda produttrice di calzature antinfortunistiche (DPI).
-        Scrivi un'email a un distributore partner.
-        
-        DETTAGLI:
-        - Nome Distributore: {nome_cliente}
+        Sei un esperto Area Manager di un'azienda di calzature antinfortunistiche (DPI).
+        Scrivi un'email a un distributore partner seguendo queste istruzioni:
+        - Destinatario: {nome_cliente}
         - Oggetto: {oggetto_mail}
-        - Stile richiesto: {istruzioni_stile}
-        - Concetti da inserire: {bozza_input}
+        - Stile: {stile}
+        - Punti chiave da includere: {bozza_input}
         
-        Nota: L'email deve sembrare scritta da una persona reale, non da un robot.
+        Importante: Scrivi in un italiano naturale, fluido e professionale. Evita frasi fatte da robot.
         """
 
-        with st.spinner('Gemini sta scrivendo per te...'):
-            response = model.generate_content(prompt)
-            st.subheader("Risultato:")
-            st.write(response.text)
-            st.button("Copia testo")
-    else:
-        st.error("Per favore, inserisci almeno il nome del cliente e i punti chiave.")
+        with st.spinner('Scrittura in corso...'):
+            try:
+                response = model.generate_content(prompt)
+                st.markdown("### Email Generata:")
+                st.code(response.text, language="text") # Il formato code facilita il copia-incolla
+            except Exception as e:
+                st.error(f"Si è verificato un errore: {e}")
+
+st.markdown("---")
+st.caption("Strumento riservato - Settore DPI Calzature")
