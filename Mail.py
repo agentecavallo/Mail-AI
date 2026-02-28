@@ -10,8 +10,8 @@ except Exception as e:
     st.error("Configura GEMINI_API_KEY nei Secrets di Streamlit!")
     st.stop()
 
-# Usiamo il nome completo del modello per evitare l'errore NotFound
-model = genai.GenerativeModel('models/gemini-1.5-flash')
+# Usiamo il nome corto 'gemini-1.5-flash' per massima compatibilità
+model = genai.GenerativeModel('gemini-1.5-flash')
 
 st.set_page_config(page_title="Area Manager AI", page_icon="👞")
 st.title("👞 Assistant Area Manager")
@@ -26,7 +26,7 @@ with col2:
     profilo = st.selectbox("Profilo Partner", ["Partner Storico", "Nuovo Lead", "Recupero Rapporto"])
     obiettivo = st.selectbox("Obiettivo", ["Svuotare Magazzino", "Inserimento Nuovo Articolo", "Aumento Sell-out", "Fissare Formazione"])
 
-bozza = st.text_area("Appunti veloci")
+bozza = st.text_area("Appunti veloci (es. porto il pranzo martedì)")
 
 def create_outlook_link(subject, body):
     query = urllib.parse.quote(body)
@@ -36,27 +36,36 @@ def create_outlook_link(subject, body):
 if st.button("Genera 2 Versioni Strategiche"):
     if distributore and bozza:
         prompt = f"""
-        Sei un Area Manager DPI. Scrivi DUE varianti di email per {distributore}.
+        Sei un Area Manager esperto di calzature antinfortunistiche. 
+        Scrivi DUE varianti di email diverse per il distributore {distributore}.
         Profilo: {profilo}. Obiettivo: {obiettivo}. Oggetto: {oggetto}. Note: {bozza}.
-        Separa le due versioni chiaramente con la scritta '---VERSIONE2---'.
+        
+        VERSIONE 1: Tono formale, tecnico, focalizzato su efficienza e dati.
+        VERSIONE 2: Tono relazionale, amichevole, focalizzato sulla partnership.
+        
+        IMPORTANTE: Separa le due versioni con la stringa esatta: ---VERSIONE2---
         """
         try:
+            # Generazione contenuto
             response = model.generate_content(prompt).text
             
             if "---VERSIONE2---" in response:
                 v1, v2 = response.split("---VERSIONE2---")
             else:
-                v1, v2 = response, "Errore generazione versione 2"
+                v1, v2 = response, "Seconda versione non generata correttamente. Riprova."
 
-            t1, t2 = st.tabs(["📌 Formale", "🤝 Relazionale"])
+            # Visualizzazione con TAB
+            t1, t2 = st.tabs(["📌 Versione Formale", "🤝 Versione Relazionale"])
+            
             with t1:
-                st.code(v1, language="text")
+                st.write(v1)
                 st.markdown(f'[📧 Apri in Outlook]({create_outlook_link(oggetto, v1)})')
+            
             with t2:
-                st.code(v2, language="text")
+                st.write(v2)
                 st.markdown(f'[📧 Apri in Outlook]({create_outlook_link(oggetto, v2)})')
+                
         except Exception as e:
-            st.error(f"Errore: {e}")
+            st.error(f"Errore di generazione: {e}. Prova a controllare la tua API Key.")
     else:
-        st.warning("Inserisci i dati!")
-        
+        st.warning("Inserisci il nome del distributore e qualche appunto per procedere!")
